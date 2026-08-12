@@ -12,8 +12,10 @@ describe("AppLayout", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("link", { name: "Overview" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Roles" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Root history" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Artifacts" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Status" })).toBeInTheDocument();
     expect(screen.getByText("content")).toBeInTheDocument();
   });
 });
