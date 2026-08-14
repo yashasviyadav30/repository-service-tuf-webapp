@@ -1,0 +1,20 @@
+# Local environment values
+.env
+
+# Python virtual environments
+.venv/
+venv/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# Test runner cache
+.pytest_cache/
+
+# Generated test fixtures
+backend/fixtures/
+
+# Frontend dependencies and build output
+node_modules/
+frontend/dist/

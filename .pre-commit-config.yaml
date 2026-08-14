@@ -1,0 +1,34 @@
+# At the repository root, because pre-commit resolves paths from there.
+# Each Python hook is scoped to backend/, so the frontend is untouched.
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+  - id: check-added-large-files
+  - id: end-of-file-fixer
+  - id: trailing-whitespace
+  - id: check-yaml
+    files: '.github/'
+- repo: https://github.com/pycqa/flake8
+  rev: '7.3.0'
+  hooks:
+  - id: flake8
+    files: 'backend/'
+- repo: https://github.com/PyCQA/isort
+  rev: '8.0.1'
+  hooks:
+  - id: isort
+    files: 'backend/'
+    args: [--check, --diff]
+- repo: https://github.com/psf/black
+  rev: '26.3.1'
+  hooks:
+  - id: black
+    files: 'backend/'
+    args: [--check, --diff]
+- repo: https://github.com/PyCQA/bandit
+  rev: '1.9.4'
+  hooks:
+  - id: bandit
+    files: 'backend/app/'
+    args: ["-r", "backend/app"]

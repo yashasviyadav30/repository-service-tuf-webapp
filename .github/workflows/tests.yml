@@ -1,0 +1,46 @@
+name: Tests and Lint
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      # Pinned by commit, the only thing an action can be held to. The tag
+      # beside each one is the release that commit is.
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8  # v5.0.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+        with:
+          python-version: '3.13'
+
+      # --locked fails when uv.lock has drifted from pyproject.toml, so a
+      # dependency added without relocking is caught here rather than in a
+      # build that quietly resolves something else.
+      - name: Install dependencies
+        run: |
+          pip install --no-cache-dir uv
+          uv sync --locked
+
+      - name: Lint
+        run: |
+          uv run flake8 app tests
+          uv run black --check --diff app tests
+          uv run isort --check --diff app tests
+          uv run bandit -q -r app
+
+      - name: Test
+        run: uv run pytest -q
