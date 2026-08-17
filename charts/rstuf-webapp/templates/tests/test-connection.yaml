@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "rstuf-webapp.fullname" . }}-test-connection"
+  labels:
+    {{- include "rstuf-webapp.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    # The health endpoint, not the repository view. This asks whether the
+    # service came up, and a repository in trouble must not read as a failed
+    # install: showing that trouble is the job.
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "rstuf-webapp.fullname" . }}:{{ .Values.service.port }}/healthz']
+  restartPolicy: Never

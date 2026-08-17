@@ -1,0 +1,111 @@
+name: Lint and Test Chart
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'charts/**'
+      - 'Dockerfile'
+      - '.github/workflows/chart.yml'
+  pull_request:
+    paths:
+      - 'charts/**'
+      - 'Dockerfile'
+      - '.github/workflows/chart.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4
+        with:
+          version: v3.14.4
+
+      # Pinned rather than 3.x: generating a test repository below installs
+      # from uv.lock with --locked, which refuses any version the manifest
+      # does not declare, and 3.x follows whatever the runner ships next.
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@0d28d3144d3a25ea2cc349d6e59901c4ff469b3b
+
+      - name: Lint the chart
+        run: ct lint --charts charts/rstuf-webapp
+
+      # Installing needs an image, and the published one lags the branch, so
+      # the branch builds its own and hands it to the cluster. This is what
+      # makes the job a test of the chart rather than of a past release.
+      - name: Build the image
+        run: docker build -t rstuf-webapp:ci .
+
+      - name: Create kind cluster
+        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3
+
+      - name: Load the image into the cluster
+        run: kind load docker-image rstuf-webapp:ci --name chart-testing
+
+      # Stands in for whatever publishes a real deployment's metadata. The
+      # repositories are generated rather than committed, so build them first.
+      - name: Publish a test repository in the cluster
+        run: |
+          python -m pip install --no-cache-dir uv
+          (cd backend && uv sync --locked --no-dev && uv run python scripts/gen_fixture.py)
+          kubectl create configmap tuf-fixtures --from-file=backend/fixtures/good
+          kubectl apply -f charts/rstuf-webapp/ci/metadata-server.yaml
+          kubectl rollout status deployment/rstuf-metadata --timeout=180s
+
+      # apiUrl is emptied because no RSTUF API runs in this cluster. The
+      # chart's default points at one, and status is read from it.
+      - name: Install the chart
+        run: |
+          base64 -w0 backend/fixtures/good/root.json | tr -d '\n' > /tmp/root.b64
+          helm install webapp charts/rstuf-webapp \
+            --set metadataUrl=http://rstuf-metadata/ \
+            --set apiUrl= \
+            --set image.repository=rstuf-webapp \
+            --set image.tag=ci \
+            --set image.pullPolicy=Never \
+            --set-file trustedRoot.value=/tmp/root.b64 \
+            --wait --timeout 5m
+
+      - name: Check it verified the repository it was pointed at
+        run: |
+          kubectl port-forward svc/webapp-rstuf-webapp 8000:80 &
+          for _ in $(seq 30); do
+            curl -sf http://127.0.0.1:8000/healthz > /dev/null && break
+            sleep 1
+          done
+
+          # Captured and printed rather than piped, so a failure shows what
+          # the service actually said instead of only that a grep found
+          # nothing.
+          overview=$(curl -sf http://127.0.0.1:8000/api/v1/overview)
+          roots=$(curl -sf http://127.0.0.1:8000/api/v1/roots)
+          echo "overview: $overview"
+          echo "roots: $roots"
+
+          echo "$overview" | grep -q '"status":"valid"'
+          echo "$roots" | grep -q '"current":3'
+
+      - name: Run the chart's own test
+        run: helm test webapp --timeout 2m
+
+      - name: Show what happened, when it did not work
+        if: failure()
+        run: |
+          kubectl get pods -o wide
+          kubectl describe pods -l app.kubernetes.io/name=rstuf-webapp
+          kubectl logs -l app.kubernetes.io/name=rstuf-webapp --tail=100
