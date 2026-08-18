@@ -1,0 +1,20 @@
+import { httpClient } from "../../../lib/httpClient";
+import { simulateLatency } from "../../../lib/mockDelay";
+import type { StatusResponse } from "../types/status.types";
+import { mockStatusReady } from "./mocks/statusMock";
+
+const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
+
+// GET /api/v1/status takes no query params -- unlike overview, there is no
+// refresh flag to thread through.
+//
+// Swap point: once #20 (backend/status) merges, flip VITE_USE_MOCKS --
+// components/hooks never change, they only ever see a
+// Promise<StatusResponse>.
+export async function getStatus(): Promise<StatusResponse> {
+  if (USE_MOCKS) {
+    await simulateLatency();
+    return mockStatusReady;
+  }
+  return httpClient.get<StatusResponse>("/v1/status");
+}
