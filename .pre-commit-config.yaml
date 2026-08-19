@@ -30,5 +30,5 @@ repos:
   rev: '1.9.4'
   hooks:
   - id: bandit
-    files: 'backend/app/'
-    args: ["-r", "backend/app"]
+    files: 'backend/src/app/'
+    args: ["-r", "backend/src/app"]

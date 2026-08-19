@@ -2,10 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""One line per request: what arrived, what it was answered with, and how
-long it took. A slow answer usually means a slow storage server, and the
-timing separates the two.
-"""
+"""One line per request: method, path, status and duration."""
 
 import logging
 import time

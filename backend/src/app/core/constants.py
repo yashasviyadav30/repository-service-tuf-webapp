@@ -2,4 +2,6 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""What every request passes through, whichever handler answers it."""
+"""Fixed values shared across the service."""
+
+TITLE = "Repository Service for TUF Webapp"

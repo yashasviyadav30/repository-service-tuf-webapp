@@ -4,11 +4,13 @@
 
 """The operational endpoint, and what happens off the map."""
 
+import importlib
 import logging
 
 import pytest
 from fastapi.testclient import TestClient
 
+import app.main
 from app.main import create_app
 from tests.base import UnitTestCase
 
@@ -39,7 +41,7 @@ class TestRequestLogging(UnitTestCase):
     def test_records_the_method_path_status_and_duration(
         self, client, caplog
     ) -> None:
-        with caplog.at_level(logging.INFO, logger="app.middleware.logging"):
+        with caplog.at_level(logging.INFO, logger="app.core.logging"):
             client.get("/healthz")
 
         messages = [record.getMessage() for record in caplog.records]
@@ -52,19 +54,20 @@ class TestRequestLogging(UnitTestCase):
         def boom() -> None:
             raise RuntimeError("something went wrong")
 
-        with caplog.at_level(logging.INFO, logger="app.middleware.logging"):
+        with caplog.at_level(logging.INFO, logger="app.core.logging"):
             TestClient(app, raise_server_exceptions=False).get("/boom")
 
         messages = [record.getMessage() for record in caplog.records]
         assert any("GET /boom -> 500 in" in line for line in messages)
 
     def test_the_application_gives_its_records_somewhere_to_go(self) -> None:
-        """The test above passes with or without this, because caplog
-        brings a handler of its own. This one does not."""
+        """The tests above pass with or without this, because caplog brings
+        a handler of its own. This one does not. Logging is configured when
+        the module is imported, so importing it again is the check."""
         saved = logging.root.handlers[:]
         logging.root.handlers.clear()
         try:
-            create_app()
+            importlib.reload(app.main)
             assert logging.root.handlers
         finally:
             logging.root.handlers[:] = saved

@@ -18,7 +18,7 @@ dependencies = [
     # locking on Linux offers it to Windows, where installing fails outright.
     # Stated once here, both work.
     "uvloop; sys_platform != 'win32'",
-    "pydantic-settings",
+    "dynaconf",
     "tuf",
     "securesystemslib[crypto]",
     "httpx",
@@ -55,5 +55,6 @@ known_first_party = ["app", "tests"]
 
 [tool.pytest.ini_options]
 # So that `pytest` and `make tests` mean the same thing from this directory.
+# `src` puts `app` on the path, `.` puts `tests` there.
 testpaths = ["tests/unit"]
-pythonpath = ["."]
+pythonpath = ["src", "."]

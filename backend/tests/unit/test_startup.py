@@ -5,8 +5,8 @@
 """Starting a deployment, configured and not."""
 
 import pytest
+from dynaconf import ValidationError
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
 
 from app.main import create_app
 from tests.base import UnitTestCase
@@ -18,7 +18,7 @@ class TestStartup(UnitTestCase):
     ) -> None:
         monkeypatch.delenv("RSTUF_METADATA_URL", raising=False)
 
-        with pytest.raises(ValidationError, match="metadata_url"):
+        with pytest.raises(ValidationError, match="METADATA_URL"):
             with TestClient(create_app()):
                 pass
 

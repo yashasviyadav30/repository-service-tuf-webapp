@@ -246,6 +246,15 @@ wheels = [
 ]
 
 [[package]]
+name = "dynaconf"
+version = "3.3.5"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/71/e4/723ba469856bb493c948985e5bd562c8a65f2b93e70c896e9764ab76de00/dynaconf-3.3.5.tar.gz", hash = "sha256:a08f6ab44025034ef3c9f86b32548ab01efd4039094a74bd9f028a43c63d016f", size = 333426, upload-time = "2026-08-05T19:50:25.16Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/95/41/b38501c34c40c3261868a2af8ed5fffe3e6d889c680638708de27eb57788/dynaconf-3.3.5-py3-none-any.whl", hash = "sha256:b3b4a753d5c866fc85466b65fc58d4954f6ed7dc8aa67f2b15bcbfd85d184687", size = 271426, upload-time = "2026-08-05T19:50:23.802Z" },
+]
+
+[[package]]
 name = "fastapi"
 version = "0.141.1"
 source = { registry = "https://pypi.org/simple" }
@@ -576,20 +585,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pydantic-settings"
-version = "2.15.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "typing-inspection" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/68/ca/31c57507b13119d7d3cfa1576dad2911a4861e3be07b579395f4e9d393f9/pydantic_settings-2.15.0.tar.gz", hash = "sha256:694b793e84f766ba76a90ebdefc01d0a9a045dab0382bee70393da93712ad117", size = 261253, upload-time = "2026-08-07T09:24:57.419Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/30/a4/2bffa9f8e804325a09867f0e9d30795c80ea9f8d62560bd1b6ad6220eb2f/pydantic_settings-2.15.0-py3-none-any.whl", hash = "sha256:0ba092c291c94baceb5eff768aa0d56400a457585bc0175925a5a5510303da42", size = 69413, upload-time = "2026-08-07T09:24:55.839Z" },
-]
-
-[[package]]
 name = "pyflakes"
 version = "3.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -734,9 +729,9 @@ name = "rstuf-webapp"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "dynaconf" },
     { name = "fastapi" },
     { name = "httpx" },
-    { name = "pydantic-settings" },
     { name = "securesystemslib", extra = ["crypto"] },
     { name = "tuf" },
     { name = "uvicorn", extra = ["standard"] },
@@ -756,9 +751,9 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "dynaconf" },
     { name = "fastapi" },
     { name = "httpx" },
-    { name = "pydantic-settings" },
     { name = "securesystemslib", extras = ["crypto"] },
     { name = "tuf" },
     { name = "uvicorn", extras = ["standard"] },
