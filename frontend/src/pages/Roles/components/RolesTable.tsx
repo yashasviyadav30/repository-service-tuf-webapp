@@ -1,4 +1,4 @@
-import type { RoleSummary } from "../types/overview.types";
+import type { RoleSummary } from "../../../shared/overview/types";
 import { ExpiryBadge } from "./ExpiryBadge";
 
 interface RolesTableProps {

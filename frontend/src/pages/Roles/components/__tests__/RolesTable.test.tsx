@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { RolesTable } from "../RolesTable";
-import type { RoleSummary } from "../../types/overview.types";
+import type { RoleSummary } from "../../../../shared/overview/types";
 
 const role: RoleSummary = {
   name: "root",

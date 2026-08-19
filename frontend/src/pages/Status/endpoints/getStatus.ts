@@ -1,9 +1,8 @@
+import { useMocks } from "../../../lib/env";
 import { httpClient } from "../../../lib/httpClient";
 import { simulateLatency } from "../../../lib/mockDelay";
 import type { StatusResponse } from "../types/status.types";
 import { mockStatusReady } from "./mocks/statusMock";
-
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 
 // GET /api/v1/status takes no query params -- unlike overview, there is no
 // refresh flag to thread through.
@@ -12,7 +11,7 @@ const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 // components/hooks never change, they only ever see a
 // Promise<StatusResponse>.
 export async function getStatus(): Promise<StatusResponse> {
-  if (USE_MOCKS) {
+  if (useMocks) {
     await simulateLatency();
     return mockStatusReady;
   }

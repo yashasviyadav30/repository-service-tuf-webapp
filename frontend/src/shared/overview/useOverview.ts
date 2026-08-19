@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { getOverview } from "../endpoints/getOverview";
-import type { OverviewResponse } from "../types/overview.types";
+import { getOverview } from "./getOverview";
+import type { OverviewResponse } from "./types";
 
 interface UseOverviewResult {
   data: OverviewResponse | null;

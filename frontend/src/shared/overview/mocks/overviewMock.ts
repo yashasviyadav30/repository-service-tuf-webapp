@@ -1,4 +1,4 @@
-import type { OverviewResponse } from "../../types/overview.types";
+import type { OverviewResponse } from "../types";
 
 // Shaped to match GET /api/v1/overview once #7 merges -- fields and
 // nesting copied from schemas.py, not invented. Delete this file's export

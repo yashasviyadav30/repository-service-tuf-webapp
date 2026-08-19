@@ -1,9 +1,8 @@
-import { httpClient } from "../../../lib/httpClient";
-import { simulateLatency } from "../../../lib/mockDelay";
-import type { OverviewResponse } from "../types/overview.types";
+import { useMocks } from "../../lib/env";
+import { httpClient } from "../../lib/httpClient";
+import { simulateLatency } from "../../lib/mockDelay";
+import type { OverviewResponse } from "./types";
 import { mockOverviewValid } from "./mocks/overviewMock";
-
-const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 
 export interface GetOverviewParams {
   // Mirrors the real ?refresh= query param on GET /api/v1/overview --
@@ -17,7 +16,7 @@ export interface GetOverviewParams {
 export async function getOverview(
   params: GetOverviewParams = {},
 ): Promise<OverviewResponse> {
-  if (USE_MOCKS) {
+  if (useMocks) {
     await simulateLatency();
     return mockOverviewValid;
   }

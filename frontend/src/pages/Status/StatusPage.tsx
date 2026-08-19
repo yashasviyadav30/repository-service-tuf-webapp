@@ -4,14 +4,11 @@ import { AwaitingSignaturesList } from "./components/AwaitingSignaturesList";
 import { KeysTable } from "./components/KeysTable";
 
 export function StatusPage() {
-  const { data, loading, error, refresh } = useStatus();
+  const { data, loading, error } = useStatus();
 
   return (
     <section>
       <h1>Status</h1>
-      <button onClick={refresh} disabled={loading}>
-        Refresh
-      </button>
       {loading && <p>Loading status...</p>}
       {error && <p role="alert">{error}</p>}
       {data && (

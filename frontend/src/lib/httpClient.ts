@@ -2,7 +2,7 @@
 // (what path, what params, mock-or-real) belong in each page's endpoints/
 // file, not here.
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
+import { apiBaseUrl as BASE_URL } from "./env";
 
 export class HttpError extends Error {
   constructor(

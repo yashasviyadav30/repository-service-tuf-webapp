@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { OverviewProvider } from "./shared/overview/OverviewContext";
 import { AppLayout } from "./shared/components/AppLayout";
 import { RolesPage } from "./pages/Roles/RolesPage";
 import { StatusPage } from "./pages/Status/StatusPage";
@@ -8,12 +9,14 @@ import { StatusPage } from "./pages/Status/StatusPage";
 export default function App() {
   return (
     <BrowserRouter>
-      <AppLayout>
-        <Routes>
-          <Route path="/" element={<RolesPage />} />
-          <Route path="/status" element={<StatusPage />} />
-        </Routes>
-      </AppLayout>
+      <OverviewProvider>
+        <AppLayout>
+          <Routes>
+            <Route path="/" element={<RolesPage />} />
+            <Route path="/status" element={<StatusPage />} />
+          </Routes>
+        </AppLayout>
+      </OverviewProvider>
     </BrowserRouter>
   );
 }

@@ -1,4 +1,4 @@
-import type { DelegatedSummary, TreeEdge } from "../types/overview.types";
+import type { DelegatedSummary, TreeEdge } from "../../../shared/overview/types";
 
 interface DelegationTreeProps {
   edges: TreeEdge[];

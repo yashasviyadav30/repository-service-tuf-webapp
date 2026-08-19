@@ -1,4 +1,4 @@
-import type { ExpiryBand } from "../types/overview.types";
+import type { ExpiryBand } from "../../../shared/overview/types";
 
 interface ExpiryBadgeProps {
   band: ExpiryBand;

@@ -1,14 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { OverviewProvider } from "../../overview/OverviewContext";
 import { AppLayout } from "../AppLayout";
 
 describe("AppLayout", () => {
   it("renders nav links and its children", () => {
     render(
       <MemoryRouter>
-        <AppLayout>
-          <p>content</p>
-        </AppLayout>
+        <OverviewProvider>
+          <AppLayout>
+            <p>content</p>
+          </AppLayout>
+        </OverviewProvider>
       </MemoryRouter>,
     );
 
