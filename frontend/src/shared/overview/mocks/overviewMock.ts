@@ -1,9 +1,9 @@
 import type { OverviewResponse } from "../types";
 
 // Shaped to match GET /api/v1/overview once #7 merges -- fields and
-// nesting copied from schemas.py, not invented. Delete this file's export
-// (or flip VITE_USE_MOCKS) once that endpoint is live; components/hooks
-// don't change either way.
+// nesting copied from schemas.py, not invented. Used by vite.mockApi.ts
+// (dev server) and by tests that mock getOverview -- application code
+// never imports this directly.
 export const mockOverviewValid: OverviewResponse = {
   status: "valid",
   checked_at: "2026-08-15T09:41:08+00:00",

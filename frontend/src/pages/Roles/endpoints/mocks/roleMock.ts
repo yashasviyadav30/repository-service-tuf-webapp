@@ -1,8 +1,10 @@
 import type { RoleDetailResponse } from "../../types/role.types";
 
 // Shaped to match GET /api/v1/roles/{role} once #23 merges -- fields and
-// nesting copied from schemas.py, not invented. getRole overrides name and
-// raw_url to match whichever role was clicked; the rest stays static.
+// nesting copied from schemas.py, not invented. Used by vite.mockApi.ts
+// (dev server, which overrides name/raw_url to match the requested role)
+// and by tests that mock getRole -- application code never imports this
+// directly.
 export const mockRoleDetail: RoleDetailResponse = {
   name: "root",
   version: 3,

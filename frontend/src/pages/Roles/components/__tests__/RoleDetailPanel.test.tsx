@@ -1,5 +1,12 @@
 import { render, screen } from "@testing-library/react";
 import { RoleDetailPanel } from "../RoleDetailPanel";
+import { mockRoleDetail } from "../../endpoints/mocks/roleMock";
+
+// getRole always calls the real API now -- mock it here rather than let
+// the test hit a real network call.
+jest.mock("../../endpoints/getRole", () => ({
+  getRole: jest.fn((role: string) => Promise.resolve({ ...mockRoleDetail, name: role })),
+}));
 
 describe("RoleDetailPanel", () => {
   it("prompts for a selection when nothing is selected", () => {

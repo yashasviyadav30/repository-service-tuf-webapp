@@ -1,9 +1,9 @@
 import type { StatusResponse } from "../../types/status.types";
 
 // Shaped to match GET /api/v1/status once #20 merges -- fields and nesting
-// copied from schemas.py, not invented. Delete this file's export (or flip
-// VITE_USE_MOCKS) once that endpoint is live; components/hooks don't
-// change either way.
+// copied from schemas.py, not invented. Used by vite.mockApi.ts (dev
+// server) and by tests that mock getStatus -- application code never
+// imports this directly.
 export const mockStatusReady: StatusResponse = {
   available: true,
   state: "ready",
