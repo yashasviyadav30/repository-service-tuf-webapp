@@ -4,9 +4,8 @@ import { AppLayout } from "./shared/components/AppLayout";
 import { RolesPage } from "./pages/Roles/RolesPage";
 import { StatusPage } from "./pages/Status/StatusPage";
 import { RootHistoryPage } from "./pages/RootHistory/RootHistoryPage";
+import { ArtifactsPage } from "./pages/Artifacts/ArtifactsPage";
 
-// Artifacts has no backend endpoint yet -- its route lands once there's a
-// real shape to build against, not before.
 export default function App() {
   return (
     <BrowserRouter>
@@ -16,6 +15,7 @@ export default function App() {
             <Route path="/" element={<RolesPage />} />
             <Route path="/status" element={<StatusPage />} />
             <Route path="/root-history" element={<RootHistoryPage />} />
+            <Route path="/artifacts" element={<ArtifactsPage />} />
           </Routes>
         </AppLayout>
       </OverviewProvider>
