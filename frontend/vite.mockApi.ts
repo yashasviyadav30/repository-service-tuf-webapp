@@ -3,6 +3,7 @@ import { simulateLatency } from "./src/lib/mockDelay";
 import { mockOverviewValid } from "./src/shared/overview/mocks/overviewMock";
 import { mockStatusReady } from "./src/pages/Status/endpoints/mocks/statusMock";
 import { mockRoleDetail } from "./src/pages/Roles/endpoints/mocks/roleMock";
+import { mockRoots } from "./src/pages/RootHistory/endpoints/mocks/rootsMock";
 
 // Dev-only: answers /api/v1/* with the same fixtures the test suite uses,
 // so `npm run dev` and demos work before a real backend exists.
@@ -27,6 +28,10 @@ export function mockApiPlugin(): Plugin {
         }
         if (url === "/api/v1/status") {
           void respond(mockStatusReady);
+          return;
+        }
+        if (url === "/api/v1/roots" || url.startsWith("/api/v1/roots?")) {
+          void respond(mockRoots);
           return;
         }
         const roleMatch = /^\/api\/v1\/roles\/([^/?]+)$/.exec(url);
