@@ -7,7 +7,7 @@ interface RolesTableProps {
   onSelectRole: (role: string) => void;
 }
 
-const STATUS_LABEL: Record<RoleStatus, string> = {
+export const STATUS_LABEL: Record<RoleStatus, string> = {
   valid: "Valid",
   expired: "Expired",
   invalid: "Invalid",

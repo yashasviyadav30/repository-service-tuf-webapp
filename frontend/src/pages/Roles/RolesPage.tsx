@@ -24,7 +24,7 @@ export function RolesPage() {
               onSelectRole={setSelectedRole}
             />
           </div>
-          <RoleDetailPanel />
+          <RoleDetailPanel selectedRole={selectedRole} />
         </div>
       )}
     </section>
