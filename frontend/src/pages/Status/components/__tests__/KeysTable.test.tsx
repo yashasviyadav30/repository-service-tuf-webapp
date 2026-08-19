@@ -12,18 +12,18 @@ const key: KeySummary = {
 };
 
 describe("KeysTable", () => {
-  it("renders one row per key with its scheme, online state, and signed roles", () => {
+  it("renders one row per key with its signed roles and who holds it", () => {
     render(<KeysTable keys={[key]} />);
 
     expect(screen.getByText("online_key")).toBeInTheDocument();
-    expect(screen.getByText("ed25519")).toBeInTheDocument();
-    expect(screen.getByText("Yes")).toBeInTheDocument();
     expect(screen.getByText("timestamp, snapshot")).toBeInTheDocument();
+    expect(screen.getByText("RSTUF (online)")).toBeInTheDocument();
   });
 
-  it("falls back to the short keyid when a key has no name, and dashes when it signs nothing", () => {
-    render(<KeysTable keys={[{ ...key, name: "", signs: [] }]} />);
+  it("marks an offline key as held offline, and dashes when it signs nothing", () => {
+    render(<KeysTable keys={[{ ...key, name: "", signs: [], online: false }]} />);
     expect(screen.getByText("a1b2c3d4")).toBeInTheDocument();
     expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.getByText("Offline")).toBeInTheDocument();
   });
 });
