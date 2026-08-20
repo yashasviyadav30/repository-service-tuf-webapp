@@ -17,8 +17,10 @@ precommit:
 	uv run pre-commit install
 	uv run pre-commit run --all-files
 
+# --app-dir puts src on the import path. Only pytest reads the pythonpath in
+# pyproject.toml, so every other entry point has to say where the app lives.
 run-dev:
-	uv run uvicorn app.main:app --reload --port 8080
+	uv run uvicorn app.main:app --reload --port 8080 --app-dir src
 
 reformat:
 	uv run black src/app tests
