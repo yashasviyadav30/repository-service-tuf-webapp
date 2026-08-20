@@ -25,7 +25,7 @@ from tests.base import UnitTestCase
 class _Endless(http.server.BaseHTTPRequestHandler):
     """Answers every request with a stream that does not end."""
 
-    def do_GET(self) -> None:  # noqa: N802 - the name http.server requires
+    def do_GET(self) -> None:  # the name http.server requires
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
@@ -43,7 +43,7 @@ class _Endless(http.server.BaseHTTPRequestHandler):
 class _Oversized(_Endless):
     """Declares a size no reader should accept, then sends it."""
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         body = b"y" * 40_000
         self.send_response(200)
         self.send_header("Content-Length", str(len(body)))

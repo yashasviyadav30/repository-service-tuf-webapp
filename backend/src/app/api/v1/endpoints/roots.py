@@ -8,17 +8,16 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.client.tuf_client import MetadataUnavailableError
-from app.dto.schemas import RootsResponse
-from app.handlers import errors
-from app.repositories.root_repository import DEFAULT_HISTORY, MAX_HISTORY
+from app.api.v1 import errors
+from app.api.v1.schemas.roots import RootsResponse
+from app.client.error import MetadataUnavailableError, TrustAnchorMissingError
+from app.core.constants import DEFAULT_HISTORY, MAX_HISTORY
 from app.services.metadata_service import (
     MetadataService,
-    TrustAnchorMissingError,
     get_metadata_service,
 )
 
-router = APIRouter(prefix="/api/v1", tags=["metadata"])
+router = APIRouter(tags=["metadata"])
 
 
 @router.get(
@@ -26,12 +25,14 @@ router = APIRouter(prefix="/api/v1", tags=["metadata"])
     response_model=RootsResponse,
     responses=errors.REPOSITORY,
 )
-async def roots(
-    limit: int = Query(
+async def get_roots(
+    depth: int = Query(
         default=DEFAULT_HISTORY,
         ge=1,
         le=MAX_HISTORY,
-        description="How many versions back to walk, newest first",
+        description="How many versions back to walk, counting from the "
+        "current one. Not an offset: the walk always starts at the root "
+        "the client verified",
     ),
     service: MetadataService = Depends(get_metadata_service),
 ) -> RootsResponse:
@@ -39,10 +40,10 @@ async def roots(
 
     Each step is checked against the rule the specification sets for a
     rotation, so a version that cannot be tied to the one before it is
-    reported as exactly that. Settled history it is not.
+    reported as exactly that.
     """
     try:
-        return await service.roots(limit=limit)
+        return await service.get_root_history(depth=depth)
     except TrustAnchorMissingError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except MetadataUnavailableError as exc:

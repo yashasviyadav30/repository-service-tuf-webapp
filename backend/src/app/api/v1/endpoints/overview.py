@@ -8,16 +8,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.client.tuf_client import MetadataUnavailableError
-from app.dto.schemas import OverviewResponse
-from app.handlers import errors
+from app.api.v1 import errors
+from app.api.v1.schemas.overview import OverviewResponse
+from app.client.error import MetadataUnavailableError, TrustAnchorMissingError
 from app.services.metadata_service import (
     MetadataService,
-    TrustAnchorMissingError,
     get_metadata_service,
 )
 
-router = APIRouter(prefix="/api/v1", tags=["metadata"])
+router = APIRouter(tags=["metadata"])
 
 
 @router.get(
@@ -26,7 +25,7 @@ router = APIRouter(prefix="/api/v1", tags=["metadata"])
     responses=errors.REPOSITORY,
     summary="Describe the repository: its roles, their state, and the tree",
 )
-async def overview(
+async def get_overview(
     refresh: bool = Query(
         default=False,
         description="Discard the cached reading and check the repository now",
@@ -40,7 +39,7 @@ async def overview(
     between them.
     """
     try:
-        return await service.overview(refresh=refresh)
+        return await service.get_overview(refresh=refresh)
     except TrustAnchorMissingError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except MetadataUnavailableError as exc:

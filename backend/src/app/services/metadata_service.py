@@ -4,75 +4,66 @@
 
 """What a request needs, and the order things happen in.
 
-One service holds the settings and the response cache. The lock that keeps a
-burst of readers from each starting a verification pass of their own is state
-on that cache, so splitting this into several services would give each of
-them a lock nobody else honours.
+One service holds the settings and the response cache. The per-key lock that
+keeps a burst of readers from each starting a verification pass lives on that
+cache, so splitting this up would give each part a lock nobody else honours.
 """
 
 from __future__ import annotations
 
 import logging
-from functools import lru_cache
+from functools import lru_cache, partial
 
-from app.client.rstuf_api_client import RstufApiClient
-from app.client.tuf_client import (
+from dynaconf import Dynaconf
+
+from app.api.v1.schemas.overview import OverviewResponse
+from app.api.v1.schemas.roots import RootsResponse
+from app.api.v1.schemas.status import StatusResponse
+from app.client.error import (
     MetadataUnavailableError,
-    RepositoryView,
-    load_repository,
-    resolve_trusted_root,
+    TrustAnchorMissingError,
 )
-from app.config import Settings, get_settings
-from app.dto.schemas import OverviewResponse, RootsResponse, StatusResponse
-from app.repositories.root_repository import (
+from app.client.rstuf_api_client import RstufApiClient
+from app.client.tuf_client import load_repository, resolve_trusted_root
+from app.config import get_settings
+from app.core.constants import (
     DEFAULT_HISTORY,
-    RootHistory,
-    load_root_history,
+    MIN_REFRESH_SECONDS,
+    OVERVIEW_KEY,
 )
+from app.models.views import RepositoryView
 from app.services import presenters
 from app.services.cache_service import TTLCache
+from app.services.root_history_service import load_root_history
 
 logger = logging.getLogger(__name__)
-
-OVERVIEW_KEY = "overview"
-
-# How recently the repository must have been read for a refresh to be turned
-# away. A visible button is pressed by everyone who arrives, so honouring
-# every press means one verification pass per visitor while the repository
-# has not moved. RSTUF's worker renews metadata every 5 minutes, so declining
-# a second look within 5 seconds gives up nothing.
-MIN_REFRESH_SECONDS = 5.0
-
-
-class TrustAnchorMissingError(RuntimeError):
-    """No trust anchor could be established, so nothing can be checked."""
 
 
 class MetadataService:
     """Reads one repository, and reuses the result briefly."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Dynaconf) -> None:
         self._settings = settings
-        self._cache = TTLCache(settings.cache_ttl_seconds)
+        self._cache = TTLCache(settings.CACHE_TTL_SECONDS)
         self._rstuf = (
-            RstufApiClient(settings.api_url, settings.request_timeout_seconds)
-            if settings.api_url
+            RstufApiClient(settings.API_URL, settings.REQUEST_TIMEOUT_SECONDS)
+            if settings.API_URL
             else None
         )
 
     def _trust_anchor(self) -> bytes:
         """Establish the one root everything else is checked against.
 
-        Trust-on-first-use is not offered. python-tuf removed it and now
-        requires an explicit bootstrap argument with no default, so the
-        choice cannot be made by accident. Taking the anchor from the
-        repository being checked would prove nothing anyway.
+        Trust-on-first-use is not offered. python-tuf requires an explicit
+        bootstrap argument with no default, so the choice cannot be made by
+        accident, and taking the anchor from the repository being checked
+        would prove nothing anyway.
         """
-        if self._settings.trusted_root:
+        if self._settings.TRUSTED_ROOT:
             try:
                 return resolve_trusted_root(
-                    self._settings.trusted_root,
-                    self._settings.request_timeout_seconds,
+                    self._settings.TRUSTED_ROOT,
+                    self._settings.REQUEST_TIMEOUT_SECONDS,
                 )
             except ValueError as exc:
                 # Pasting root.json in unencoded is the obvious mistake, and
@@ -89,11 +80,13 @@ class MetadataService:
     async def _load(self) -> RepositoryView:
         """Run one verification pass against the repository."""
         return await load_repository(
-            metadata_url=self._settings.metadata_url,
+            metadata_url=self._settings.METADATA_URL,
             bootstrap=self._trust_anchor(),
         )
 
-    async def view(self, refresh: bool = False) -> RepositoryView:
+    async def get_repository_view(
+        self, refresh: bool = False
+    ) -> RepositoryView:
         """Return a verified view, reusing a recent one unless asked not to.
 
         A refresh counts only when the answer in hand is old enough that a
@@ -105,36 +98,39 @@ class MetadataService:
                 self._cache.clear()
         return await self._cache.get_or_build(OVERVIEW_KEY, self._load)
 
-    async def overview(self, refresh: bool = False) -> OverviewResponse:
+    async def get_overview(self, refresh: bool = False) -> OverviewResponse:
         """Describe the repository for the first render."""
-        return presenters.build_overview(await self.view(refresh=refresh))
+        return presenters.build_overview(
+            await self.get_repository_view(refresh=refresh)
+        )
 
-    async def roots(self, limit: int = DEFAULT_HISTORY) -> RootsResponse:
+    async def get_root_history(
+        self, depth: int = DEFAULT_HISTORY
+    ) -> RootsResponse:
         """Report root's history, and whether each rotation in it holds up.
 
         The walk starts from the root the client verified, so the history is
         keyed by that version: publishing a new root retires the cached answer
         instead of leaving a stale chain on the page.
         """
-        view = await self.view()
+        view = await self.get_repository_view()
         trusted = view.documents.get("root")
         if trusted is None:
             raise MetadataUnavailableError("root metadata is not available")
 
-        async def build() -> RootHistory:
-            return await load_root_history(
-                self._settings.metadata_url,
-                trusted,
-                limit,
-                self._settings.request_timeout_seconds,
-            )
-
         history = await self._cache.get_or_build(
-            f"roots:{trusted.signed.version}:{limit}", build
+            f"roots:{trusted.signed.version}:{depth}",
+            partial(
+                load_root_history,
+                self._settings.METADATA_URL,
+                trusted,
+                depth,
+                self._settings.REQUEST_TIMEOUT_SECONDS,
+            ),
         )
         return presenters.build_root_history(history)
 
-    async def status(self) -> StatusResponse:
+    async def get_status(self) -> StatusResponse:
         """Report live repository status, without letting it break the page."""
         if self._rstuf is None:
             return StatusResponse(
@@ -150,7 +146,7 @@ class MetadataService:
             # worth reporting on, so failing to read it drops the keys and
             # keeps the rest.
             try:
-                view = await self.view()
+                view = await self.get_repository_view()
                 root = view.documents.get("root")
                 keys = list(presenters.key_summaries(root).values())
             except (MetadataUnavailableError, TrustAnchorMissingError):

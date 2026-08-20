@@ -21,73 +21,16 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass, field
-from datetime import datetime
 
 from tuf.api.exceptions import RepositoryError
 from tuf.api.metadata import Metadata, Root
 
-from app.client.tuf_client import (
-    ROOT_MAX_BYTES,
-    MetadataUnavailableError,
-    fetch_within,
-)
+from app.client.error import MetadataUnavailableError
+from app.client.tuf_client import fetch_within
+from app.core.constants import DEFAULT_HISTORY, MAX_HISTORY, ROOT_MAX_BYTES
+from app.models.roots import RootHistory, RootRevision, SignatureCheck
 
 logger = logging.getLogger(__name__)
-
-# How far back to walk unless asked otherwise. A long-lived repository may
-# hold hundreds of versions, and fetching every one of them to draw a page
-# nobody scrolled is work done for the repository, not for the reader.
-DEFAULT_HISTORY = 20
-MAX_HISTORY = 256
-
-
-@dataclass
-class SignatureCheck:
-    """The outcome of one threshold check, with the numbers behind it."""
-
-    verified: bool
-    present: int
-    threshold: int
-
-
-@dataclass
-class RootRevision:
-    """One version of root, and the checks run against it."""
-
-    version: int
-    expires: datetime
-    document: Metadata
-    by_own_keys: SignatureCheck
-    by_previous_keys: SignatureCheck | None = None
-    note: str | None = None
-
-    @property
-    def verified(self) -> bool:
-        """True when every check that applies to this version passed.
-
-        Version one has no predecessor it could have rotated from, and nor
-        does a version whose predecessor was never fetched. Both are honest
-        gaps, recorded as such and never counted as failures.
-        """
-        if not self.by_own_keys.verified:
-            return False
-        if self.by_previous_keys is None:
-            return True
-        return self.by_previous_keys.verified
-
-
-@dataclass
-class RootHistory:
-    """Every version of root that was read, newest first."""
-
-    current: int
-    revisions: list[RootRevision] = field(default_factory=list)
-    message: str | None = None
-
-    @property
-    def earliest(self) -> int:
-        return self.revisions[-1].version if self.revisions else self.current
 
 
 def _root_url(metadata_url: str, version: int) -> str:
@@ -100,7 +43,9 @@ def _root_url(metadata_url: str, version: int) -> str:
     return f"{base}{version}.root.json"
 
 
-def _fetch(metadata_url: str, version: int, timeout: float) -> Metadata:
+def _fetch_root_version(
+    metadata_url: str, version: int, timeout: float
+) -> Metadata:
     """Retrieve one version of root, unverified."""
     url = _root_url(metadata_url, version)
     return Metadata.from_bytes(
@@ -113,7 +58,7 @@ def _fetch(metadata_url: str, version: int, timeout: float) -> Metadata:
     )
 
 
-def _check(delegator: Root, child: Metadata) -> SignatureCheck:
+def _check_signatures(delegator: Root, child: Metadata) -> SignatureCheck:
     """Ask one version of root whether it authorised the signatures on another.
 
     ``get_verification_result`` reports the outcome instead of raising it,
@@ -142,13 +87,16 @@ def _rotation_note(newer: RootRevision, older: RootRevision) -> str | None:
     )
 
 
-def _walk(
+def _walk_root_history(
     metadata_url: str,
     trusted: Metadata,
-    limit: int,
+    depth: int,
     timeout: float,
 ) -> RootHistory:
     """Read backwards from the trusted root, checking each rotation.
+
+    ``depth`` counts versions back from the current one, not an offset: the
+    walk always starts at the root the client verified.
 
     Blocking, so keep it off the event loop.
     """
@@ -157,14 +105,14 @@ def _walk(
         version=current,
         expires=trusted.signed.expires,
         document=trusted,
-        by_own_keys=_check(trusted.signed, trusted),
+        by_own_keys=_check_signatures(trusted.signed, trusted),
     )
     history = RootHistory(current=current, revisions=[newest])
 
     newer = newest
-    for version in range(current - 1, max(0, current - limit), -1):
+    for version in range(current - 1, max(0, current - depth), -1):
         try:
-            document = _fetch(metadata_url, version, timeout)
+            document = _fetch_root_version(metadata_url, version, timeout)
         except MetadataUnavailableError as exc:
             history.message = f"History stops here: {exc}"
             break
@@ -201,12 +149,14 @@ def _walk(
             version=document.signed.version,
             expires=document.signed.expires,
             document=document,
-            by_own_keys=_check(document.signed, document),
+            by_own_keys=_check_signatures(document.signed, document),
         )
 
         # The older version is what authorises the rotation into the newer
         # one, so the older version is what performs that check.
-        newer.by_previous_keys = _check(document.signed, newer.document)
+        newer.by_previous_keys = _check_signatures(
+            document.signed, newer.document
+        )
         newer.note = newer.note or _rotation_note(newer, older)
 
         if not older.by_own_keys.verified:
@@ -231,11 +181,11 @@ def _walk(
 async def load_root_history(
     metadata_url: str,
     trusted: Metadata,
-    limit: int = DEFAULT_HISTORY,
+    depth: int = DEFAULT_HISTORY,
     timeout: float = 10.0,
 ) -> RootHistory:
     """Read root's history, off the event loop."""
-    limit = max(1, min(limit, MAX_HISTORY))
+    depth = max(1, min(depth, MAX_HISTORY))
     return await asyncio.to_thread(
-        _walk, metadata_url, trusted, limit, timeout
+        _walk_root_history, metadata_url, trusted, depth, timeout
     )

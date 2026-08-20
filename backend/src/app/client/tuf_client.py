@@ -4,10 +4,8 @@
 
 """Fetch and verify a repository's TUF metadata.
 
-Verification is `tuf.ngclient.Updater`'s work, not ours. It resolves the
-metadata chain and checks signatures, thresholds, expiry and rollback,
-writing what it accepted into a local trust directory. This module reads
-those files back; it never validates metadata itself.
+Verification is `tuf.ngclient.Updater`'s work. This module reads back what
+it accepted; it never validates metadata itself.
 """
 
 from __future__ import annotations
@@ -18,7 +16,6 @@ import binascii
 import logging
 import shutil
 import tempfile
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -30,63 +27,14 @@ from tuf.api.exceptions import (
     RepositoryError,
 )
 from tuf.api.metadata import Metadata
-from tuf.ngclient import Updater, UpdaterConfig
+from tuf.ngclient import Updater
 
-from app.dto.schemas import RoleStatus
+from app.client.error import MetadataUnavailableError
+from app.core.constants import ROOT_MAX_BYTES, UPDATER_CONFIG
+from app.enums import TOP_LEVEL_ROLES, RoleStatus
+from app.models.views import RepositoryView, RoleView
 
 logger = logging.getLogger(__name__)
-
-TOP_LEVEL_ROLES = ("root", "timestamp", "snapshot", "targets")
-
-# The library's own cap for root metadata, applied to the anchor too.
-ROOT_MAX_BYTES = 512_000
-
-
-class MetadataUnavailableError(RuntimeError):
-    """The metadata could not be retrieved at all.
-
-    Not the same as metadata that arrived and failed verification. Broken
-    trust is what this service exists to show; an unreachable repository
-    leaves nothing to show.
-    """
-
-
-@dataclass
-class RoleView:
-    """One verified role, read back from the trust directory."""
-
-    name: str
-    version: int
-    expires: datetime
-    status: RoleStatus
-    threshold: int | None = None
-    key_count: int | None = None
-    delegates_to: list[str] = field(default_factory=list)
-
-
-@dataclass
-class RepositoryView:
-    """The repository, as far as it could be resolved."""
-
-    roles: list[RoleView] = field(default_factory=list)
-    verification_error: str | None = None
-    expired: bool = False
-    """Whether verification stopped because something had lapsed.
-
-    Taken from the exception type the library raised, not from its message.
-    Those messages are not an interface and can be reworded in a release.
-    """
-    documents: dict[str, Metadata] = field(default_factory=dict)
-    delegated: dict[str, int | None] = field(default_factory=dict)
-    checked_at: datetime = field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
-    """When this reading was taken.
-
-    Recorded on the reading, because it is served from a cache long after it
-    was built and the page reports its age. Deriving that later samples two
-    clocks and disagrees with itself.
-    """
 
 
 def resolve_trusted_root(value: str, timeout: float = 10.0) -> bytes:
@@ -122,13 +70,14 @@ def fetch_within(url: str, *, limit: int, timeout: float, what: str) -> bytes:
 
     UpdaterConfig bounds every fetch the library makes. The fetches written
     here are bounded here. Reading a whole response and then measuring it is
-    not a bound: by the time the length is known the bytes are already held,
-    and how many there are was decided by a storage server this service does
-    not control.
+    not a bound: by the time the length is known the bytes are already held.
 
     The declared length is checked first, because a server that is honest
     about being too large saves the transfer entirely. It is not trusted: the
     body is counted as it arrives either way.
+
+    Redirects are followed, as python-tuf's own fetcher does, so the cap
+    holds whatever the final response turns out to be.
     """
     received = bytearray()
     too_large = MetadataUnavailableError(
@@ -136,7 +85,9 @@ def fetch_within(url: str, *, limit: int, timeout: float, what: str) -> bytes:
     )
 
     try:
-        with httpx.stream("GET", url, timeout=timeout) as response:
+        with httpx.stream(
+            "GET", url, timeout=timeout, follow_redirects=True
+        ) as response:
             response.raise_for_status()
 
             declared = response.headers.get("content-length")
@@ -173,9 +124,8 @@ def _status_for(metadata: Metadata, now: datetime) -> RoleStatus:
 def _delegated_names(targets: Metadata) -> list[str]:
     """List the roles `targets` delegates to, in whichever form it uses.
 
-    A delegation is declared either as named roles or as a succinct-roles
-    rule that generates them (TAP 15, which is what RSTUF publishes). The
-    library resolves both, so no naming scheme or bin count is assumed here.
+    Named roles or a succinct-roles rule (TAP 15, which is what RSTUF
+    publishes). The library resolves both, so no bin count is assumed here.
     """
     delegations = getattr(targets.signed, "delegations", None)
     if delegations is None:
@@ -192,8 +142,8 @@ def _delegated_versions(
 ) -> dict[str, int | None]:
     """Name every delegated role and pin its version, fetching nothing.
 
-    Names come from the rule in targets, versions from snapshot. Both files
-    are already verified, so 256 bins cost nothing to describe.
+    Names come from the rule in targets, versions from snapshot. Both are
+    already verified, so 256 bins cost nothing to describe.
     """
     targets = documents.get("targets")
     if targets is None:
@@ -254,24 +204,6 @@ def _read_trust_directory(
     return views, documents
 
 
-# What the client will accept from a storage server nobody here controls.
-# The length caps are generous for real metadata: a 256-bin repository has
-# a snapshot listing every bin and is nowhere near 2 MB.
-#
-# max_root_rotations is what makes pinning a root once and leaving it safe.
-# The client walks forward from the version it holds, checking each rotation
-# against the one before it, and this is how far it will walk.
-UPDATER_CONFIG = UpdaterConfig(
-    max_root_rotations=256,
-    max_delegations=32,
-    root_max_length=512_000,
-    timestamp_max_length=16_384,
-    snapshot_max_length=2_000_000,
-    targets_max_length=5_000_000,
-    app_user_agent="rstuf-webapp/0.1.0",
-)
-
-
 def _refresh(
     trust_dir: Path, metadata_url: str, bootstrap: bytes | None
 ) -> None:
@@ -292,13 +224,10 @@ async def load_repository(
     """Verify the repository and describe what was found.
 
     Metadata that fails verification is reported, not raised: showing a
-    repository in trouble is the point. Only an unreachable one raises,
-    because then there is nothing to show.
+    repository in trouble is the point. Only an unreachable one raises.
 
-    The client writes what it accepts into a directory made for this pass
-    and removed after it. One that outlived the pass would answer with roles
-    verified some time ago, stamped with the time of the request that found
-    them lying there, and anything else left in it would be read as a role.
+    The trust directory is made for this pass and removed after it, so no
+    reading can be answered from files an earlier pass left behind.
     """
     verification_error: str | None = None
     expired = False

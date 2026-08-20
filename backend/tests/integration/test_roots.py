@@ -18,15 +18,14 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.config import Settings
+from app.core.constants import MAX_HISTORY
 from app.main import create_app
-from app.repositories.root_repository import MAX_HISTORY
 from app.services.metadata_service import (
     MetadataService,
     get_metadata_service,
 )
 from tests.base import RepositoryTestCase
-from tests.conftest import FIXTURE_ROOT
+from tests.conftest import FIXTURE_ROOT, service_settings
 
 
 def versions_in(body: dict) -> dict[int, dict]:
@@ -120,7 +119,7 @@ class TestRootHistory(RepositoryTestCase):
         assert versions[1]["expires_in"] == "superseded by version 3"
 
     def test_stops_where_asked_and_says_it_stopped(self, webapp) -> None:
-        body = webapp("good").get("/api/v1/roots?limit=2").json()
+        body = webapp("good").get("/api/v1/roots?depth=2").json()
 
         assert [entry["version"] for entry in body["versions"]] == [3, 2]
         assert body["earliest"] == 2
@@ -129,9 +128,9 @@ class TestRootHistory(RepositoryTestCase):
     def test_rejects_a_limit_outside_the_allowed_range(self, webapp) -> None:
         client = webapp("good")
 
-        assert client.get("/api/v1/roots?limit=0").status_code == 422
+        assert client.get("/api/v1/roots?depth=0").status_code == 422
         assert (
-            client.get(f"/api/v1/roots?limit={MAX_HISTORY + 1}").status_code
+            client.get(f"/api/v1/roots?depth={MAX_HISTORY + 1}").status_code
             == 422
         )
 
@@ -166,7 +165,7 @@ class TestAVersionServedUnderAnotherName(RepositoryTestCase):
 
         anchor = (served / "3.root.json").read_bytes()
         service = MetadataService(
-            Settings(
+            service_settings(
                 metadata_url=serve_directory(served),
                 trusted_root=base64.b64encode(anchor).decode(),
             )
@@ -202,7 +201,7 @@ class TestAnArchivedRootEditedAfterSigning(RepositoryTestCase):
 
         anchor = (served / "root.json").read_bytes()
         service = MetadataService(
-            Settings(
+            service_settings(
                 metadata_url=serve_directory(served),
                 trusted_root=base64.b64encode(anchor).decode(),
             )
@@ -273,7 +272,7 @@ class TestSomethingOtherThanRootServedAsRoot(RepositoryTestCase):
         )
 
         service = MetadataService(
-            Settings(
+            service_settings(
                 metadata_url=serve_directory(served),
                 trusted_root=base64.b64encode(
                     (served / "3.root.json").read_bytes()

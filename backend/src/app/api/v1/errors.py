@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.dto.schemas import ErrorResponse
+from app.api.v1.schemas.common import ErrorResponse
 
 _UNREACHABLE = {
     "model": ErrorResponse,

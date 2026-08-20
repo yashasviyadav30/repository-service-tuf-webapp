@@ -15,35 +15,29 @@ from datetime import datetime, timezone
 
 from tuf.api.metadata import Metadata
 
-from app.client.tuf_client import RepositoryView
-from app.dto.schemas import (
+from app.api.v1.schemas.overview import (
     DelegatedSummary,
-    ExpiryBand,
-    KeyChangeAction,
-    KeySummary,
     OverviewResponse,
-    RoleStatus,
     RoleSummary,
+    TreeEdge,
+)
+from app.api.v1.schemas.roots import (
     RootKeyChange,
     RootRoleChange,
     RootsResponse,
     RootVersionSummary,
     SignatureCheckSummary,
-    TreeEdge,
 )
-from app.repositories.root_repository import (
-    RootHistory,
-    RootRevision,
-    SignatureCheck,
+from app.api.v1.schemas.status import KeySummary
+from app.core.constants import (
+    DAY,
+    RSTUF_KEY_NAME,
+    RSTUF_ONLINE_KEY_URI,
+    WEEK,
 )
-
-# RSTUF records a readable name on each key it publishes, and the address of
-# the service holding it where the key is an online one.
-RSTUF_KEY_NAME = "x-rstuf-key-name"
-RSTUF_ONLINE_KEY_URI = "x-rstuf-online-key-uri"
-
-DAY = 86_400
-WEEK = 7 * DAY
+from app.enums import ExpiryBand, KeyChangeAction, RoleStatus
+from app.models.roots import RootHistory, RootRevision, SignatureCheck
+from app.models.views import RepositoryView
 
 
 def _plural(count: int, noun: str) -> str:
@@ -62,6 +56,14 @@ def expiry_band(
 
     if seconds <= 0:
         past = abs(seconds)
+        # Minutes below the hour, because whole hours read as "0h ago" for
+        # the first sixty minutes after a role lapses.
+        if past < 3600:
+            minutes = int(past // 60)
+            return (
+                ExpiryBand.EXPIRED,
+                f"expired {_plural(minutes, 'minute')} ago",
+            )
         if past < DAY:
             return ExpiryBand.EXPIRED, f"expired {int(past // 3600)}h ago"
         days = int(past // DAY)
@@ -280,7 +282,7 @@ def _role_changes(older: object, newer: object) -> list[RootRoleChange]:
 
 
 def _check_summary(check: SignatureCheck | None) -> SignatureCheckSummary:
-    if check is None:  # pragma: no cover - the walk always sets this one
+    if check is None:  # the walk always sets this one
         return SignatureCheckSummary(verified=False, present=0, threshold=0)
     return SignatureCheckSummary(
         verified=check.verified,
