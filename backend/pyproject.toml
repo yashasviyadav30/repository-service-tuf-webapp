@@ -1,0 +1,60 @@
+# The project, its libraries, and the settings the tools read. uv resolves
+# what is listed here into uv.lock, and that lock is what an install reads.
+
+[project]
+name = "rstuf-webapp"
+version = "0.1.0"
+description = "Read-only web view of a TUF repository managed by RSTUF"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    # Named here only to carry the marker uvicorn's own metadata does not.
+    #
+    # The standard extra pulls uvloop, which does not build on Windows and
+    # says so. Without the marker the lock offers it to every platform:
+    # locking on Windows drops it, so the Linux image cannot pin it, and
+    # locking on Linux offers it to Windows, where installing fails outright.
+    # Stated once here, both work.
+    "uvloop; sys_platform != 'win32'",
+    "dynaconf",
+    "tuf",
+    "securesystemslib[crypto]",
+    "httpx",
+]
+
+[dependency-groups]
+dev = [
+    "black",
+    "isort",
+    "flake8",
+    "bandit",
+    "pre-commit",
+    "pytest",
+    "pytest-asyncio",
+]
+
+# A service, not a library, so there is nothing to build and install.
+[tool.uv]
+package = false
+
+[tool.black]
+line-length = 79
+# Without this black reads requires-python and formats for a version this
+# interpreter cannot parse, which it then warns about on every run.
+target-version = ["py313"]
+
+# Read by isort whether it is run from here, as CI does, or from the
+# repository root, as the git hook does. Without known_first_party the two
+# disagree: from the root, `app` looks like a package from PyPI.
+[tool.isort]
+profile = "black"
+line_length = 79
+known_first_party = ["app", "tests"]
+
+[tool.pytest.ini_options]
+# So that `pytest` and `make tests` mean the same thing from this directory.
+# `src` puts `app` on the path, `.` puts `tests` there.
+testpaths = ["tests/unit", "tests/integration"]
+pythonpath = ["src", "."]
