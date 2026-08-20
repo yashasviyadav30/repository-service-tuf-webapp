@@ -1,19 +1,29 @@
-import type { RoleStatus } from "../overview/types";
+import type { TrustState } from "../overview/trustState";
+import { StatusDot } from "./StatusDot";
 
 interface TrustPillProps {
-  status: RoleStatus;
+  state: TrustState;
 }
 
-const LABEL: Record<RoleStatus, string> = {
-  valid: "Healthy",
+const LABEL: Record<TrustState, string> = {
+  healthy: "Healthy",
+  expiring: "Expires within a day",
   expired: "Expired",
   invalid: "Verification failed",
 };
 
-// Spec also names an "expires within a day" pill state, but nothing in
-// OverviewResponse marks that repository-wide -- only a per-role
-// ExpiryBand, and CRITICAL there is timestamp's normal daily-renewal
-// state, not a warning. Left out rather than guessed at.
-export function TrustPill({ status }: TrustPillProps) {
-  return <span className={`trust-pill trust-pill--${status}`}>{LABEL[status]}</span>;
+const DOT_COLOR: Record<TrustState, "green" | "amber" | "red"> = {
+  healthy: "green",
+  expiring: "amber",
+  expired: "red",
+  invalid: "red",
+};
+
+export function TrustPill({ state }: TrustPillProps) {
+  return (
+    <span className={`trust-pill trust-pill--${state}`}>
+      <StatusDot color={DOT_COLOR[state]} />
+      {LABEL[state]}
+    </span>
+  );
 }
